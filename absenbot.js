@@ -96,7 +96,7 @@ async function startBot() {
   cron.schedule('15 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:15 Senin–Kamis
   cron.schedule('45 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:45 Jumat
 
-  // Cek dan kirim ucapan ulang tahun setiap hari jam 00:01
+  // Cek dan kirim ucapan ulang tahun setiap hari jam 06:01
   setInterval(async () => {
     const now = new Date();
     if (now.getHours() === 6 && now.getMinutes() === 1) {
