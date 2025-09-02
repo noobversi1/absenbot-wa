@@ -99,7 +99,7 @@ async function startBot() {
   // Cek dan kirim ucapan ulang tahun setiap hari jam 00:01
   setInterval(async () => {
     const now = new Date();
-    if (now.getHours() === 0 && now.getMinutes() === 1) {
+    if (now.getHours() === 6 && now.getMinutes() === 1) {
       await cekDanKirimUcapan(sock);
     }
   }, 60 * 1000);
