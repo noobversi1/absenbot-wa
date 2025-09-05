@@ -16,7 +16,7 @@ const groupIds = [
 
 const scheduledMessage = '📢 *Pengingat Absen:*\nJangan lupa absen ya, semangat beraktivitas!';
 
-const sheetURL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQBxpgdXX8WjET96FcOy4yCq_rflJc0eE28Sx6egQ3_KHPhvV5dTM9eqQXnEUsNvfPrmrotC3fZ65uU/pub?output=csv'; // Ganti sesuai URL Sheet-mu
+const sheetURL = 'https://docs.google.com/spreadsheets/d/e/......pub?output=csv'; // Ganti sesuai URL Sheet-mu
 
 let isConnected = false;
 
