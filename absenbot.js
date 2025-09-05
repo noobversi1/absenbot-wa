@@ -143,11 +143,16 @@ async function cekDanKirimUcapan(sock) {
 
   for (const data of listUltah) {
     if (data.tanggal === tglHariIni) {
-      try {
-        await sock.sendMessage(data.tujuan, { text: data.pesan });
-        console.log(`🎉 Ucapan terkirim ke ${data.nama} (${data.tujuan})`);
-      } catch (err) {
-        console.error(`❌ Gagal kirim ke ${data.nama}:`, err);
+      // Pisahkan tujuan jika ada banyak, dipisah dengan koma
+      const tujuanList = data.tujuan.split(',').map(t => t.trim());
+
+      for (const tujuan of tujuanList) {
+        try {
+          await sock.sendMessage(tujuan, { text: data.pesan });
+          console.log(`🎉 Ucapan terkirim ke ${data.nama} (${tujuan})`);
+        } catch (err) {
+          console.error(`❌ Gagal kirim ke ${data.nama} (${tujuan}):`, err);
+        }
       }
     }
   }
