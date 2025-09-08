@@ -10,7 +10,7 @@ const fs = require('fs');
 const qrcode = require('qrcode-terminal');
 
 const groupIds = [
-  '120363419214033177@g.us', // Ganti dengan ID grupmu
+  //  '120363419214033177@g.us', // Ganti dengan ID grupmu
   '120363334862606010@g.us',
   // 'ID_GRUP_LAINNYA@g.us'
 ];
