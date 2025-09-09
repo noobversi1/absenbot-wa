@@ -67,38 +67,13 @@ async function startBot() {
     const msg = messages[0];
     if (!msg.message) return;
 
-
-    console.log("📩 Pesan masuk:", JSON.stringify(msg, null, 2));
-
-    const body =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      '';
-
+    const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
     const sender = msg.key.remoteJid;
 
-    // ✅ fitur #hi tetap
     if (body.toLowerCase() === '#hi') {
       await sock.sendMessage(sender, { text: '👋 Hai juga! Bot ini aktif dan siap membantu.' });
     }
-
-    // ✅ fitur respon balasan
-    const context = msg.message?.extendedTextMessage?.contextInfo;
-    if (context?.quotedMessage) {
-      console.log("📌 Ini adalah balasan!");
-      const replyText = body || '';
-
-      // Nomor target yang mau ditag (misal "Meta AI")
-      const tagNumber = "13135550002@s.whatsapp.net"; // ganti nomor target
-
-      await sock.sendMessage(sender, {
-        text: `@${tagNumber.split('@')[0]} ${replyText}`,
-        mentions: [tagNumber]
-      });
-    }
   });
-
 
   // Kirim pesan absen terjadwal
   function kirimPesanKeGrup() {
