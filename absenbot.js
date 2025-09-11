@@ -17,8 +17,6 @@ const groupIds = [
 
 const scheduledMessage = '📢 *Pengingat Absen:*\nJangan lupa absen ya, semangat beraktivitas!';
 
-const sheetURL = 'https://docs.google.com/spreadsheets/d/e/......pub?output=csv'; // Ganti sesuai URL Sheet-mu
-
 let isConnected = false;
 
 async function startBot() {
@@ -95,38 +93,36 @@ async function startBot() {
   cron.schedule('15 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 07:15 Senin–Jumat
   cron.schedule('45 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 07:45 Senin–Jumat
   cron.schedule('15 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:15 Senin–Kamis
+  cron.schedule('0 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:00 Senin–Kamis
   cron.schedule('45 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:45 Jumat
+  cron.schedule('30 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:30 Jumat
 
-  // Cek dan kirim ucapan ulang tahun setiap hari jam 06:01
-  setInterval(async () => {
-    const now = new Date();
-    if (now.getHours() === 6 && now.getMinutes() === 1) {
-      await cekDanKirimUcapan(sock);
-    }
-  }, 60 * 1000);
+  // Cek dan kirim ucapan ulang tahun setiap hari jam 06:01 WIB
+  cron.schedule('15 6 * * *', () => {
+    cekDanKirimUcapan(sock);
+  }, { timezone: 'Asia/Jakarta' });
 }
 
-// Ambil data ulang tahun dari Google Sheets
-async function ambilDataUlangTahun() {
+// Ambil data ulang tahun dari file ultah.txt
+async function bacaFileUltah() {
   try {
-    const res = await fetch(sheetURL);
-    const data = await res.text();
-    const rows = data.split('\n').slice(1); // lewati header
-
+    const data = fs.readFileSync('./ultah.txt', 'utf-8');
+    const rows = data.split('\n').filter(line => line.trim() !== '');
     return rows.map(row => {
       const [nama, tanggal, pesan, tujuan] = row.split(',');
       return {
         nama: nama?.trim(),
-        tanggal: tanggal?.trim(),
+        tanggal: tanggal?.trim().replace(/[-]/g, '/'),
         pesan: pesan?.trim(),
-        tujuan: tujuan?.trim().replace(/\r/g, '') // buang \r kalau ada
+        tujuan: tujuan?.trim()
       };
     });
   } catch (err) {
-    console.error('❌ Gagal ambil data ulang tahun:', err);
+    console.error('❌ Gagal baca file ultah.txt:', err);
     return [];
   }
 }
+
 
 // Kirim ucapan ulang tahun
 async function cekDanKirimUcapan(sock) {
@@ -140,7 +136,7 @@ async function cekDanKirimUcapan(sock) {
     month: '2-digit'
   });
 
-  const listUltah = await ambilDataUlangTahun();
+  const listUltah = await bacaFileUltah();
 
   for (const data of listUltah) {
     if (data.tanggal === tglHariIni) {
