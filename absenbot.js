@@ -7,6 +7,7 @@ const {
 const { Boom } = require('@hapi/boom');
 const cron = require('node-cron');
 const fs = require('fs');
+const path = require('path');
 const qrcode = require('qrcode-terminal');
 
 const groupIds = [
@@ -98,7 +99,7 @@ async function startBot() {
   cron.schedule('30 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:30 Jumat
 
   // Cek dan kirim ucapan ulang tahun setiap hari jam 06:01 WIB
-  cron.schedule('15 6 * * *', () => {
+  cron.schedule('1 6 * * *', () => {
     cekDanKirimUcapan(sock);
   }, { timezone: 'Asia/Jakarta' });
 }
@@ -106,10 +107,10 @@ async function startBot() {
 // Ambil data ulang tahun dari file ultah.txt
 async function bacaFileUltah() {
   try {
-    const data = fs.readFileSync('./ultah.txt', 'utf-8');
+    const data = fs.readFileSync(path.join(__dirname, 'ultah.txt'), 'utf-8');
     const rows = data.split('\n').filter(line => line.trim() !== '');
     return rows.map(row => {
-      const [nama, tanggal, pesan, tujuan] = row.split(',');
+      const [nama, tanggal, pesan, tujuan] = row.split(';');
       return {
         nama: nama?.trim(),
         tanggal: tanggal?.trim().replace(/[-]/g, '/'),
@@ -140,16 +141,11 @@ async function cekDanKirimUcapan(sock) {
 
   for (const data of listUltah) {
     if (data.tanggal === tglHariIni) {
-      // Pisahkan tujuan jika ada banyak, dipisah dengan koma
-      const tujuanList = data.tujuan.split(',').map(t => t.trim());
-
-      for (const tujuan of tujuanList) {
-        try {
-          await sock.sendMessage(tujuan, { text: data.pesan });
-          console.log(`🎉 Ucapan terkirim ke ${data.nama} (${tujuan})`);
-        } catch (err) {
-          console.error(`❌ Gagal kirim ke ${data.nama} (${tujuan}):`, err);
-        }
+      try {
+        await sock.sendMessage(data.tujuan, { text: data.pesan });
+        console.log(`🎉 Ucapan terkirim ke ${data.nama} (${data.tujuan})`);
+      } catch (err) {
+        console.error(`❌ Gagal kirim ke ${data.nama} (${data.tujuan}):`, err);
       }
     }
   }
