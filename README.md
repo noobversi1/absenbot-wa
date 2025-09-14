@@ -31,6 +31,10 @@ npm install @whiskeysockets/baileys
 qrcode-terminal
 npm install qrcode-terminal
 
+better-sqlite3
+npm install better-sqlite3
+
+
 fs (biasanya bawaan Node.js)
 moment / dayjs (opsional untuk tanggal)
 npm install moment
