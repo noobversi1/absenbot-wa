@@ -43,3 +43,5 @@ npm install moment
 pm2 start index.js --name absenbot-wa
 pm2 save
 pm2 startup
+
+Gunakan perintah #hi untuk melihat apakah bot jalan dan perintah #listgroups untuk melihat ID grup
