@@ -1,3 +1,6 @@
+// ========================
+// DEPENDENCY
+// ========================
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -10,36 +13,47 @@ const fs = require('fs');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
 
+// Import helper DB
+const { Mapping, BotMessage } = require('./dbHelper');
+
+// ========================
+// KONFIG
+// ========================
 const groupIds = [
-  //  '120363419214033177@g.us', // Ganti dengan ID grupmu
   '120363334862606010@g.us',
-  // 'ID_GRUP_LAINNYA@g.us'
 ];
-
 const scheduledMessage = '📢 *Pengingat Absen:*\nJangan lupa absen ya, semangat beraktivitas!';
-
+const adminNumber = '628XXXXXXX@s.whatsapp.net'; // ganti dengan nomor admin
 let isConnected = false;
+let sock; // socket global
+const processedIds = new Set(); // anti-duplikat pesan
 
+// ========================
+// START BOT
+// ========================
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('./session');
   const { version } = await fetchLatestBaileysVersion();
 
-  const sock = makeWASocket({
-    version,
-    auth: state,
-  });
+  // cleanup socket lama
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+      sock.end();
+    } catch {}
+  }
 
-  // Tampilkan QR di terminal
+  sock = makeWASocket({ version, auth: state });
+
+  // Tampilkan QR
   sock.ev.on('connection.update', ({ qr }) => {
-    if (qr) {
-      qrcode.generate(qr, { small: true });
-    }
+    if (qr) qrcode.generate(qr, { small: true });
   });
 
-  // Simpan sesi secara otomatis
+  // Simpan sesi otomatis
   sock.ev.on('creds.update', saveCreds);
 
-  // Tampilkan daftar grup saat koneksi terbuka
+  // Update koneksi
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
 
@@ -61,50 +75,117 @@ async function startBot() {
     }
   });
 
-  // Balas pesan masuk
+  // Handle pesan masuk
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message) return;
+    if (!msg.message || msg.key.fromMe) return;
+
+    // anti-duplikat
+    if (processedIds.has(msg.key.id)) return;
+    processedIds.add(msg.key.id);
 
     const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-    const sender = msg.key.remoteJid;
 
+    // === Command sederhana ===
     if (body.toLowerCase() === '#hi') {
-      await sock.sendMessage(sender, { text: '👋 Hai juga! Bot ini aktif dan siap membantu.' });
+      const sent = await sock.sendMessage(msg.key.remoteJid, { text: '👋 Hai juga! Bot ini aktif dan siap membantu.' });
+      BotMessage.simpan(sent.key.id, msg.key.remoteJid, '👋 Hai juga! Bot ini aktif dan siap membantu.');
+    }
+
+    // === Reply ke pesan BOT di grup ===
+    if (msg.key.remoteJid.endsWith('@g.us') && msg.message.extendedTextMessage?.contextInfo) {
+      const context = msg.message.extendedTextMessage.contextInfo;
+      const quotedId = context.stanzaId;
+      const quotedMsgText = context.quotedMessage?.conversation
+        || context.quotedMessage?.extendedTextMessage?.text
+        || "";
+
+      console.log("📩 Incoming reply context:", context);
+
+      // Cari pesan bot
+      let foundBotMsg = quotedId ? BotMessage.byStanza(quotedId) : null;
+      if (!foundBotMsg && quotedMsgText) {
+        foundBotMsg = BotMessage.byText(msg.key.remoteJid, quotedMsgText);
+      }
+      if (!foundBotMsg && quotedMsgText) {
+        foundBotMsg = BotMessage.byTextLike(msg.key.remoteJid, quotedMsgText);
+      }
+
+      if (foundBotMsg) {
+        console.log("✅ Reply ke PESAN BOT terdeteksi:", foundBotMsg);
+        Mapping.simpan(
+          foundBotMsg.stanzaId,
+          msg.key.remoteJid,
+          adminNumber,
+          msg.pushName,
+          context.quotedMessage || ""
+        );
+
+        const replyText = msg.message.extendedTextMessage?.text || '';
+        await sock.sendMessage(adminNumber, {
+          text: `[Reply ke BOT dari ${msg.pushName}]\n${replyText}`
+        });
+      } else {
+        console.log("⚠️ Reply ini bukan ke pesan BOT yang terekam, diabaikan.");
+      }
+    }
+
+    // === Kalau admin balas ===
+    if (msg.key.remoteJid === adminNumber) {
+      const replyText = msg.message.conversation
+        || msg.message.extendedTextMessage?.text
+        || '';
+      const lastMap = Mapping.byForward(adminNumber);
+
+      if (lastMap) {
+        await sock.sendMessage(lastMap.groupId, {
+          text: replyText,
+          contextInfo: {
+            stanzaId: lastMap.stanzaId,
+            participant: sock.user.id,
+            quotedMessage: lastMap.quotedMessage || {}
+          }
+        });
+        console.log(`📤 Balasan admin diteruskan ke grup ${lastMap.groupId}`);
+      } else {
+        console.log("⚠️ Tidak ada mapping untuk admin; tidak ada grup tujuan.");
+      }
     }
   });
-
-  // Kirim pesan absen terjadwal
-  function kirimPesanKeGrup() {
-    if (!isConnected) {
-      console.log('⚠️ Bot belum siap, lewati pengiriman pesan grup.');
-      return;
-    }
-    groupIds.forEach(async (groupId) => {
-      try {
-        await sock.sendMessage(groupId, { text: scheduledMessage });
-        console.log(`✅ Pesan terkirim ke ${groupId}`);
-      } catch (err) {
-        console.error(`❌ Gagal kirim ke ${groupId}:`, err);
-      }
-    });
-  }
-
-  // Jadwal pengiriman pesan
-  cron.schedule('15 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 07:15 Senin–Jumat
-  cron.schedule('45 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 07:45 Senin–Jumat
-  cron.schedule('15 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:15 Senin–Kamis
-  cron.schedule('0 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:00 Senin–Kamis
-  cron.schedule('45 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:45 Jumat
-  cron.schedule('30 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' }); // 16:30 Jumat
-
-  // Cek dan kirim ucapan ulang tahun setiap hari jam 06:01 WIB
-  cron.schedule('1 6 * * *', () => {
-    cekDanKirimUcapan(sock);
-  }, { timezone: 'Asia/Jakarta' });
 }
 
-// Ambil data ulang tahun dari file ultah.txt
+// ========================
+// CRON JOB PESAN ABSEN
+// ========================
+function kirimPesanKeGrup() {
+  if (!isConnected) {
+    console.log('⚠️ Bot belum siap, lewati pengiriman pesan grup.');
+    return;
+  }
+  groupIds.forEach(async (groupId) => {
+    try {
+      const sent = await sock.sendMessage(groupId, { text: scheduledMessage });
+      BotMessage.simpan(sent.key.id, groupId, scheduledMessage);
+      console.log(`✅ Pesan terkirim ke ${groupId}`);
+    } catch (err) {
+      console.error(`❌ Gagal kirim ke ${groupId}:`, err);
+    }
+  });
+}
+
+// pasang cron sekali aja
+cron.schedule('15 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+cron.schedule('45 7 * * 1-5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+cron.schedule('15 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+cron.schedule('0 16 * * 1-4', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+cron.schedule('45 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+cron.schedule('30 16 * * 5', kirimPesanKeGrup, { timezone: 'Asia/Jakarta' });
+
+cron.schedule('1 6 * * *', () => cekDanKirimUcapan(sock), { timezone: 'Asia/Jakarta' });
+
+// ========================
+// FUNGSI ULANG TAHUN
+// ========================
 async function bacaFileUltah() {
   try {
     const data = fs.readFileSync(path.join(__dirname, 'ultah.txt'), 'utf-8');
@@ -124,8 +205,6 @@ async function bacaFileUltah() {
   }
 }
 
-
-// Kirim ucapan ulang tahun
 async function cekDanKirimUcapan(sock) {
   if (!isConnected) {
     console.log('⚠️ Bot belum tersambung, tidak mengirim ucapan.');
@@ -151,7 +230,9 @@ async function cekDanKirimUcapan(sock) {
   }
 }
 
-// Tampilkan semua grup yang terhubung
+// ========================
+// DAFTAR GRUP
+// ========================
 async function tampilkanDaftarGrup(sock) {
   try {
     const groups = await sock.groupFetchAllParticipating();
@@ -164,5 +245,5 @@ async function tampilkanDaftarGrup(sock) {
   }
 }
 
+// jalankan bot
 startBot();
-
