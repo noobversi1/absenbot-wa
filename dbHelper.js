@@ -1,8 +1,10 @@
 // dbHelper.js
 const Database = require('better-sqlite3');
+const path = require('path');
 
-// buka atau buat database
-const db = new Database('database.db');
+// buka atau buat database di folder data
+const dbPath = path.join(__dirname, 'data', 'database.db');
+const db = new Database(dbPath);
 
 // bikin tabel kalau belum ada
 db.prepare(`
