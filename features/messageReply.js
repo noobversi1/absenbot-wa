@@ -1,10 +1,26 @@
-const { BotMessage, Mapping } = require('./dbHelper');
-const { isConnected, sock } = require('./botCore');
+const { BotMessage, Mapping } = require('../dbHelper');
+const { isConnected, sock } = require('../core/botCore');
 
 const adminNumber = '628XXXXXXX@s.whatsapp.net';
 const processedIds = new Set();
 
+async function tampilkanDaftarGrup(sockInstance) {
+  try {
+    const groups = await sockInstance.groupFetchAllParticipating();
+    let msg = '📋 *Daftar Grup:* \n';
+    for (const [id, group] of Object.entries(groups)) {
+      msg += `• ${group.subject} | ID: ${id}\n`;
+    }
+    return msg;
+  } catch (err) {
+    console.error('❌ Gagal ambil daftar grup:', err);
+    return '❌ Gagal ambil daftar grup.';
+  }
+}
+
 function setupMessageReply(sockInstance) {
+  if (!sockInstance) throw new Error('❌ sockInstance belum terinisialisasi! Pastikan startBot() dipanggil dulu.');
+
   sockInstance.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -15,8 +31,20 @@ function setupMessageReply(sockInstance) {
 
     // Command sederhana
     if (body.toLowerCase() === '#hi') {
-      const sent = await sockInstance.sendMessage(msg.key.remoteJid, { text: '👋 Hai juga! Bot ini aktif dan siap membantu.' });
-      BotMessage.simpan(sent.key.id, msg.key.remoteJid, '👋 Hai juga! Bot ini aktif dan siap membantu.');
+      try {
+        const sent = await sockInstance.sendMessage(msg.key.remoteJid, { text: '👋 Hai juga! Bot ini aktif dan siap membantu.' });
+        BotMessage.simpan(sent.key.id, msg.key.remoteJid, '👋 Hai juga! Bot ini aktif dan siap membantu.');
+      } catch (err) {
+        console.log('❌ Gagal kirim pesan #hi:', err);
+      }
+    }
+
+    // Command daftar grup
+    if (body.toLowerCase() === '#listgroups') {
+      if (!msg.key.fromMe) { // opsional: hanya admin bisa lihat
+        const daftar = await tampilkanDaftarGrup(sockInstance);
+        await sockInstance.sendMessage(msg.key.remoteJid, { text: daftar });
+      }
     }
 
     // Reply ke pesan bot
@@ -37,7 +65,7 @@ function setupMessageReply(sockInstance) {
           msg.key.remoteJid,
           adminNumber,
           msg.pushName,
-          context.quotedMessage || ""
+          context.quotedMessage || {}
         );
 
         const replyText = msg.message.extendedTextMessage?.text || '';

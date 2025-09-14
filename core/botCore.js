@@ -10,10 +10,7 @@ async function startBot() {
   const { version } = await fetchLatestBaileysVersion();
 
   if (sock) {
-    try {
-      sock.ev.removeAllListeners();
-      sock.end();
-    } catch {}
+    try { sock.ev.removeAllListeners(); sock.end(); } catch {}
   }
 
   sock = makeWASocket({ version, auth: state });
@@ -29,7 +26,7 @@ async function startBot() {
     if (connection === 'close') {
       isConnected = false;
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log('🔌 Koneksi terputus. Mencoba menyambung ulang...');
+      console.log('🔌 Koneksi terputus. Mencoba reconnect...');
       if (reason !== DisconnectReason.loggedOut) startBot();
       else console.log('❌ Harus login ulang. Hapus folder "session" lalu jalankan ulang.');
     }
@@ -40,4 +37,4 @@ async function startBot() {
   return sock;
 }
 
-module.exports = { startBot, isConnected, sock };
+module.exports = { startBot, sock, isConnected };
