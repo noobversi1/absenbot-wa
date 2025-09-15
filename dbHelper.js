@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS bot_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   stanzaId TEXT,
   groupId TEXT,
-  message TEXT
+  message TEXT,
+  date TEXT
 )
 `).run();
 
@@ -56,11 +57,14 @@ const Mapping = {
 // BotMessage object
 // ==================
 const BotMessage = {
-  simpan(stanzaId, groupId, message) {
+  simpan(stanzaId, groupId, message, date) {
+    // pastikan date adalah objek Date
+    const d = (date instanceof Date) ? date : new Date(date);
+
     db.prepare(`
-      INSERT INTO bot_messages (stanzaId, groupId, message)
-      VALUES (?, ?, ?)
-    `).run(stanzaId, groupId, message);
+      INSERT INTO bot_messages (stanzaId, groupId, message, date)
+      VALUES (?, ?, ?, ?)
+    `).run(stanzaId, groupId, message, d.toISOString());
 
     console.log("✅ Pesan bot tersimpan:", stanzaId);
   },
@@ -75,6 +79,13 @@ const BotMessage = {
 
   byTextLike(groupId, text) {
     return db.prepare(`SELECT * FROM bot_messages WHERE groupId = ? AND message LIKE ? ORDER BY id DESC LIMIT 1`).get(groupId, `%${text}%`);
+  },
+
+  byTextAndDate(groupId, text, date) {
+    return db.prepare(`
+      SELECT * FROM bot_messages 
+      WHERE groupId = ? AND message = ? AND date = ?
+    `).get(groupId, text, date);
   }
 };
 

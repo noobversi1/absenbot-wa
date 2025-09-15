@@ -18,11 +18,6 @@ async function startBot() {
   sock.ev.on('connection.update', ({ qr, connection, lastDisconnect }) => {
     if (qr) qrcode.generate(qr, { small: true });
 
-    if (connection === 'open') {
-      isConnected = true;
-      console.log('✅ Bot WhatsApp siap digunakan!');
-    }
-
     if (connection === 'close') {
       isConnected = false;
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;

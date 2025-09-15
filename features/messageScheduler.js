@@ -9,25 +9,26 @@ async function safeSend(sock, jid, message, maxRetry = 3) {
   while (attempt < maxRetry) {
     try {
       const sent = await sock.sendMessage(jid, message);
+      console.log(`✅ Pesan terkirim ke ${jid}`);
       return sent;
     } catch (err) {
       attempt++;
-      await new Promise(r => setTimeout(r, 1000));
+      console.warn(`⚠️ Gagal kirim ke ${jid}, percobaan ${attempt}/${maxRetry}`);
+      await new Promise(r => setTimeout(r, 2000)); // jeda 2 detik sebelum retry
     }
   }
+  console.error(`❌ Gagal kirim pesan ke ${jid} setelah ${maxRetry} percobaan`);
+  return null;
 }
 
 async function kirimPesanKeGrup(sock) {
   if (!sock || !sock.user) return;
 
-  for (const groupId of groupIds) {
-    // Cek apakah sudah pernah dikirim hari ini
-    const today = new Date().toISOString().slice(0, 10);
-    const alreadySent = await BotMessage.byTextAndDate(groupId, scheduledMessage, today);
-    if (alreadySent) continue;
+  const today = new Date().toISOString().slice(0, 10);
 
+  for (const groupId of groupIds) {
     const sent = await safeSend(sock, groupId, { text: scheduledMessage });
-    if (sent) await BotMessage.simpan(sent.key.id, groupId, scheduledMessage, new Date());
+    if (sent) BotMessage.simpan(sent.key.id, groupId, scheduledMessage, new Date());
   }
 }
 
@@ -41,7 +42,9 @@ function pasangScheduler(sock) {
     '30 16 * * 5'
   ];
 
-  times.forEach(t => cron.schedule(t, () => kirimPesanKeGrup(sock), { timezone: 'Asia/Jakarta' }));
+  times.forEach(t => 
+    cron.schedule(t, () => kirimPesanKeGrup(sock), { timezone: 'Asia/Jakarta' })
+  );
 }
 
 module.exports = { kirimPesanKeGrup, pasangScheduler };
